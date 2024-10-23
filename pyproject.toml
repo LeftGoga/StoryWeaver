@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "dnd-bot"
+version = "0.1.0"
+description = ""
+authors = ["Egor Polyakov <leftgoga@yandex.ru>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+swarm = {git = "https://github.com/openai/swarm.git"}
+astra-assistants = "^2.2.2"
+python-dotenv = "^1.0.1"
+agency-swarm = "^0.3.0"
+griptape = "^0.33.1"
+speechrecognition = "^3.11.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
