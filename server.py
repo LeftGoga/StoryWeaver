@@ -4,7 +4,13 @@ import websockets
 import asyncio
 import functools
 import os
+import whisper  # Import Whisper for speech-to-text
+import sounddevice as sd
+import numpy as np
 from mistralai import Mistral
+
+# Initialize Whisper model
+whisper_model = whisper.load_model("large")  # You can also use 'small', 'medium', or 'large' based on accuracy needs
 
 # Example data
 data = {
@@ -16,7 +22,6 @@ data = {
 }
 
 df = pd.DataFrame(data)
-
 
 def retrieve_payment_status(df: pd.DataFrame, transaction_id: str) -> str:
     if transaction_id in df.transaction_id.values:
@@ -81,85 +86,86 @@ client = Mistral(api_key=api_key)
 
 
 async def process_conversation(client, model, messages, tools, names_to_functions):
-    # Request response from the model
     print("Sending request to the model...")
     response = client.chat.complete(
         model=model,
         messages=messages,
         tools=tools,
-        tool_choice="auto"  # Try enforcing the tool usage
+        tool_choice="auto"
     )
 
-    # Debug: Print full response
-    print("Raw API response:", response)
-
-    # Add model response to messages
     messages.append(response.choices[0].message)
 
-    # Process tool calls
     if response.choices[0].message.tool_calls:
-        print("Tool call(s) detected...")
-
-        # Handle each tool call
         for tool_call in response.choices[0].message.tool_calls:
             function_name = tool_call.function.name
             function_params = json.loads(tool_call.function.arguments)
 
-            # Execute the corresponding tool
             if function_name in names_to_functions:
                 function_result = names_to_functions[function_name](**function_params)
-                print(f"Tool '{function_name}' result:", function_result)
+                messages.append({"role": "tool", "name": function_name, "content": function_result, "tool_call_id": tool_call.id})
 
-                # Add the tool result back to messages
-                messages.append(
-                    {"role": "tool", "name": function_name, "content": function_result, "tool_call_id": tool_call.id})
-
-        # After processing tool calls, send the conversation back to the model
-        print("Sending updated conversation to the model...")
-        response = client.chat.complete(
-            model=model,
-            messages=messages
-        )
+        response = client.chat.complete(model=model, messages=messages)
         messages.append(response.choices[0].message)
-        print("Final response:", response.choices[0].message.content)
         return response.choices[0].message.content
     else:
-        print("No tool call found.")
         return response.choices[0].message.content
+
+
+# Function to record audio using the microphone
+def record_audio(duration=5, sample_rate=16000):
+    print("Recording audio...")
+    audio = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=1, dtype=np.float32)
+    sd.wait()  # Wait for the recording to complete
+    audio = np.squeeze(audio)  # Remove extra dimensions
+    return audio
+
+
+# Function to use Whisper for speech-to-text
+def recognize_speech_whisper(language='ru'):
+    audio = record_audio()
+    print("Processing audio with Whisper...")
+    # Convert audio to the format expected by Whisper (16kHz, single-channel)
+    result = whisper_model.transcribe(np.array(audio), fp16=False,language=language)
+    return result['text']
 
 
 async def handle_client(websocket, path):
-    # Initial message list
     messages = []
 
     try:
         async for message in websocket:
             print(f"Received message: {message}")
 
-            # Add user message to conversation
-            messages.append({"role": "user", "content": message})
+            if message == "start_speech_recognition":
+                try:
+                    # Use Whisper for speech-to-text
+                    voice_input = recognize_speech_whisper()
+                    print(f"Recognized voice input: {voice_input}")
 
-            # Process the conversation with the model
-            response = await process_conversation(client, model, messages, tools, names_to_functions)
+                    # Add recognized text to conversation
+                    messages.append({"role": "user", "content": voice_input})
+                    response = await process_conversation(client, model, messages, tools, names_to_functions)
+                    await websocket.send(response)
 
-            # Send back the final model response to the WebSocket client
-            await websocket.send(response)
-            # The connection should stay open to process additional messages
-            print("Message processed, connection still open.")
+                except Exception as e:
+                    await websocket.send(f"Speech recognition error: {e}")
+            else:
+                messages.append({"role": "user", "content": message})
+                response = await process_conversation(client, model, messages, tools, names_to_functions)
+                await websocket.send(response)
 
     except websockets.exceptions.ConnectionClosed:
-        print("Connection closed by client.")
+        print("Connection closed.")
     except Exception as e:
         print(f"Error: {e}")
-        await websocket.send("An error occurred on the server side. Connection remains open.")
-
-
+        await websocket.send("Server error occurred.")
 
 
 async def main():
     print("WebSocket server is starting...")
     async with websockets.serve(handle_client, "localhost", 8765):
-        await asyncio.Future()  # Run forever
+        await asyncio.Future()  # Keep server running indefinitely
 
 
 # Run the WebSocket server
