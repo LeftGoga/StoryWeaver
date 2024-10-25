@@ -8,6 +8,8 @@ import whisper  # Import Whisper for speech-to-text
 import sounddevice as sd
 import numpy as np
 from mistralai import Mistral
+from gtts import gTTS
+import io
 
 # Initialize Whisper model
 whisper_model = whisper.load_model("large")  # You can also use 'small', 'medium', or 'large' based on accuracy needs
@@ -130,6 +132,21 @@ def recognize_speech_whisper(language='ru'):
     return result['text']
 
 
+
+
+
+async def text_to_speech(text, language="ru"):
+    # Generate speech from text
+    tts = gTTS(text=text, lang=language, slow=False)
+
+    # Save the audio to a bytes buffer instead of a file
+    audio_buffer = io.BytesIO()
+    tts.write_to_fp(audio_buffer)
+    audio_buffer.seek(0)  # Reset buffer pointer to the beginning
+
+    return audio_buffer.read()
+
+
 async def handle_client(websocket, path):
     messages = []
 
@@ -137,23 +154,35 @@ async def handle_client(websocket, path):
         async for message in websocket:
             print(f"Received message: {message}")
 
-            if message == "start_speech_recognition":
-                try:
-                    # Use Whisper for speech-to-text
-                    voice_input = recognize_speech_whisper()
-                    print(f"Recognized voice input: {voice_input}")
+            if message.startswith("speech"):
+                voice_input = recognize_speech_whisper()  # Language handled by Whisper automatically
+                print(f"Recognized voice input: {voice_input}")
 
-                    # Add recognized text to conversation
-                    messages.append({"role": "user", "content": voice_input})
-                    response = await process_conversation(client, model, messages, tools, names_to_functions)
-                    await websocket.send(response)
+                # Add recognized text to conversation
+                messages.append({"role": "user", "content": voice_input})
+                response = await process_conversation(client, model, messages, tools, names_to_functions)
 
-                except Exception as e:
-                    await websocket.send(f"Speech recognition error: {e}")
+                # Send text response back
+                await websocket.send(response)
+
+                # Generate audio from the response text
+                audio_data = await text_to_speech(response)
+
+                # Send the audio as a binary message
+                await websocket.send(audio_data)
+
             else:
                 messages.append({"role": "user", "content": message})
                 response = await process_conversation(client, model, messages, tools, names_to_functions)
+
+                # Send text response back
                 await websocket.send(response)
+
+                # Generate audio from the response text
+                audio_data = await text_to_speech(response)
+
+                # Send the audio as a binary message
+                await websocket.send(audio_data)
 
     except websockets.exceptions.ConnectionClosed:
         print("Connection closed.")
