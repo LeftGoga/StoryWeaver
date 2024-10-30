@@ -6,7 +6,7 @@ import io
 
 async def chat_with_agent():
     uri = "ws://localhost:8765"
-    async with websockets.connect(uri) as websocket:
+    async with websockets.connect(uri, ping_interval=None) as websocket:
         print("Connected to the server. Type 'exit' to quit.")
 
         while True:
