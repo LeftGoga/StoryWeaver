@@ -4,30 +4,24 @@ import asyncio
 import websockets
 import io
 
-async def chat_with_agent():
+async def listen_to_agent():
     uri = "ws://localhost:8765"
     async with websockets.connect(uri, ping_interval=None) as websocket:
-        print("Connected to the server. Type 'exit' to quit.")
+        print("Connected to the server for continuous interaction. Press Ctrl+C to exit.")
 
-        while True:
-            # Take user input
-            message = input("You: ")
+        try:
+            while True:
+                # Wait for the server's response text
+                response_text = await websocket.recv()
+                print(f"Agent: {response_text}")
 
-            if message.lower() == 'exit':
-                print("Exiting the chat...")
-                break
+                # Wait for the server's audio response and play it
+                audio_data = await websocket.recv()
+                audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
+                play(audio)
 
-            # Send message to the server
-            await websocket.send(message)
-
-            # Wait for response from the server (first text, then audio)
-            response = await websocket.recv()
-            print(f"Agent: {response}")
-
-            # Receive the audio response (binary data) and play it
-            audio_data = await websocket.recv()
-            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
-            play(audio)
+        except KeyboardInterrupt:
+            print("Exiting the interaction...")
 
 # Run the client
-asyncio.run(chat_with_agent())
+asyncio.run(listen_to_agent())
