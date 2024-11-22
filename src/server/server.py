@@ -1,36 +1,28 @@
-# import sys
-# import os
-#
-# # Add the src folder to the system path to allow imports from it
-# sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'src')))
-# import os
-# print("Current working directory:", os.getcwd())
-import whisper
-from mistralai import Mistral
+
+from model import create_whisper_model,create_mistral_agent
 from src.audio_processing.audio_processing import record_audio_for_wake_word, record_audio_fixed_duration, \
     text_to_speech
 
 import websockets
 from src.utlis.conversation import process_conversation
 
-from src.configs import device, whisper_model_size ,api_key,model_name
-from src.tools.payment_tool import retrieve_payment_date,retrieve_payment_status
-from src.tools.music import play_online_music,stop_music
-from src.tools.dungeon_map import generate_dungeon_map
-from src.tools.rag import retrieve_related_chunks
+from src.configs import model_name
+
 from src.tools.tools_config import tools_dict, names_to_functions_dict
 import asyncio
 music_player = None
 
+play_obj = None
+playback_thread = None
 
 
-whisper_model = whisper.load_model(whisper_model_size).to(device)
+whisper_model = create_whisper_model()
 
 tools = tools_dict
 names_to_functions = names_to_functions_dict
 
 
-client = Mistral(api_key=api_key)
+client = create_mistral_agent()
 
 
 async def send_custom_heartbeat(websocket):
@@ -44,7 +36,7 @@ async def send_custom_heartbeat(websocket):
 
 async def handle_client(websocket, path):
     messages = []
-    heartbeat_task = asyncio.create_task(send_custom_heartbeat(websocket))
+    heartbeat_task = asyncio.create_task(send_custom_heartbeat(websocket))  # Heartbeat task to keep the connection alive
 
     try:
         while True:
@@ -60,7 +52,8 @@ async def handle_client(websocket, path):
                 voice_input = whisper_model.transcribe(audio, fp16=False)['text']
                 print(f"Transcription for wake word detection: {voice_input}")
 
-                if "met" in voice_input.replace(" ","").lower() or "mat" in voice_input.replace(" ","").lower()or "мэт" in voice_input.replace(" ","").lower():
+                if "met" in voice_input.replace(" ","").lower() or "mat" in voice_input.replace(" ","").lower() or "мэт" in voice_input.replace(" ","").lower() or "bad" in voice_input.replace(" ","").lower()\
+                        or "mad" in voice_input.replace(" ","").lower():
                     print("Wake word detected. Recording full input...")
                     break  # Proceed to record the full input
 
@@ -72,7 +65,14 @@ async def handle_client(websocket, path):
             # Step 3: Process full input and interact with Mistral API
             processed_input = full_input.replace("StoryWeaver", "").strip()
             messages.append({"role": "user", "content": processed_input})
-            response = await process_conversation(client, model_name, messages, tools, names_to_functions)
+            try:
+
+                response = await process_conversation(client, model_name, messages, tools, names_to_functions)
+                print("response: ", response)
+            except Exception as e:
+                print(f"Error processing conversation: {e}")
+                response = "Error processing request; please try again."
+
             if response in ["No-op"]:
                 print("Placeholder response received; resuming listening.")
                 continue  # Immediately go back to listening without TTS
@@ -85,17 +85,37 @@ async def handle_client(websocket, path):
                 print("Audio response generated.")
 
                 # Step 5: Send both responses concurrently
-                await asyncio.gather(
-                    websocket.send(response),         # Send text response
-                    websocket.send(audio_data)        # Send audio response
-                )
+                try:
+                    await asyncio.gather(
+                        websocket.send(response),         # Send text response
+                        websocket.send(audio_data)        # Send audio response
+                    )
+                    print("Response sent successfully.")
+                except websockets.exceptions.ConnectionClosed as e:
+                    print(f"Error sending response to client: {e}. WebSocket may have closed unexpectedly.")
+                    break  # Stop processing if the connection is closed
+                except Exception as e:
+                    print(f"Unexpected error during response send: {e}")
+                    break  # Exit loop on unexpected errors
 
-            print("Response sent successfully. Waiting for the next wake word...")
+            print("Waiting for the next wake word...")
 
+    except websockets.exceptions.ConnectionClosed as e:
+        print(f"Connection closed by the client or server: {e}")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
     finally:
-        heartbeat_task.cancel()
-        await websocket.wait_closed()
+        # Gracefully close the WebSocket connection when the client disconnects
+        print("Closing WebSocket connection.")
+        try:
+            await websocket.send("Closing connection.")  # Inform the client of closure
+        except Exception as e:
+            print(f"Error sending close message: {e}")
+        await websocket.close()  # Close the WebSocket connection properly
+        heartbeat_task.cancel()  # Cancel the heartbeat task
+        await websocket.wait_closed()  # Ensure the WebSocket is properly closed
         print("Client connection fully closed.")
+
 
 
 async def main():

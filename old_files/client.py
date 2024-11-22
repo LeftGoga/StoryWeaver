@@ -1,8 +1,17 @@
-from pydub import AudioSegment
-from pydub.playback import play
 import asyncio
 import websockets
 import io
+from pydub import AudioSegment
+from pydub.playback import play
+import pygame
+import io
+
+def play_audio_with_pygame(audio_data):
+    pygame.mixer.init()
+    pygame.mixer.music.load(io.BytesIO(audio_data))
+    pygame.mixer.music.play()
+    while pygame.mixer.music.get_busy():
+        pygame.time.Clock().tick(10)
 
 async def listen_to_agent():
     uri = "ws://localhost:8765"
@@ -15,11 +24,14 @@ async def listen_to_agent():
                 response_text = await websocket.recv()
                 print(f"Agent: {response_text}")
 
-                # Wait for the server's audio response and play it
+                # Wait for the server's audio response
                 audio_data = await websocket.recv()
-                audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
-                play(audio)
 
+                # Play the received audio directly (without threading)
+                try:
+                    play_audio_with_pygame(audio_data)
+                except Exception as e:
+                    print(f"Error while playing audio: {e}")
         except KeyboardInterrupt:
             print("Exiting the interaction...")
 

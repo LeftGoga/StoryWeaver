@@ -24,6 +24,10 @@ torch = "^2.5.1+cu124"
 pytube = "^15.0.0"
 torchvision = "^0.20.1+cu124"
 torchaudio = "^2.5.1+cu124"
+pafy = "^0.5.5"
+youtube-dl = "^2021.12.17"
+pygame = "^2.6.1"
+simpleaudio = "^1.0.4"
 
 
 [build-system]

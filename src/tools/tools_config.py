@@ -1,6 +1,6 @@
 import functools
 from src.tools.payment_tool import retrieve_payment_date,retrieve_payment_status
-from src.tools.music import play_online_music,stop_music
+from src.tools.music import play_music_from_playlist,stop_audio
 from src.tools.dungeon_map import generate_dungeon_map
 import pandas as pd
 
@@ -68,28 +68,33 @@ tools_dict = [
             },
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "play_online_music",
-            "description": "Play mood-specific background music from YouTube",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "mood": {
-                        "type": "string",
-                        "description": "The type of music mood, e.g., 'ambient', 'action', 'mystery'.",
-                    }
+{
+    "type": "function",
+    "function": {
+        "name": "play_music_from_playlist",
+        "description": "Play certain music depending on user query",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "user request on playing certain type of music",
                 },
-                "required": ["mood"],
+                "volume": {
+                    "type": "integer",
+                    "description": "The playback volume level (1-100). Default is 50.",
+                    "default": 50,
+                },
             },
+            "required": ["query"],
         },
     },
+},
     {
         "type": "function",
         "function": {
-            "name": "stop_music",
-            "description": "Выключает музыку которая играет сейчас",
+            "name": "stop_audio",
+            "description": "Stops the music that is playing right now ",
             "parameters": {
                 "type": "object",
                 "properties": {},
@@ -118,8 +123,8 @@ tools_dict = [
 names_to_functions_dict = {
     'retrieve_payment_status': functools.partial(retrieve_payment_status, df=df),
     'retrieve_payment_date': functools.partial(retrieve_payment_date, df=df),
-    'retrieve_related_chunks': functools.partial(retrieve_related_chunks),
-    'play_online_music': play_online_music,
-    'stop_music': stop_music,
+    'retrieve_related_chunks': retrieve_related_chunks,
+    'play_music_from_playlist': play_music_from_playlist,
+    'stop_audio': stop_audio,
 "generate_dungeon_map":  generate_dungeon_map
 }

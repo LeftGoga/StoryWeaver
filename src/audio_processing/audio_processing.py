@@ -3,7 +3,6 @@ import numpy as np
 from gtts import gTTS
 import io
 
-
 def record_audio(duration=5, sample_rate=16000):
     """
     Запмсь аудио
@@ -37,7 +36,7 @@ def record_audio_fixed_duration(duration=5, sample_rate=16000):
     sd.wait()
     return np.squeeze(audio)
 
-def record_audio_for_wake_word(duration=2, sample_rate=16000, threshold=0.03):
+def record_audio_for_wake_word(duration=2, sample_rate=16000, threshold=0.06):
 
     """
     отслеживание wake-word
@@ -80,3 +79,20 @@ def generate_silent_audio(duration=1):
     silent_audio = np.zeros(num_samples, dtype=np.float32)
     audio_bytes = silent_audio.tobytes()  # Convert to bytes for sending
     return audio_bytes
+
+
+if __name__ == "__main__":
+    import asyncio
+    from pydub import AudioSegment
+    from pydub.playback import play
+    import time
+    async def main():
+        audio_data = await text_to_speech("тест 1")
+        audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
+        play(audio)
+        audio_data = await text_to_speech("тест 2")
+        audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
+        play(audio)
+
+
+    asyncio.run(main())

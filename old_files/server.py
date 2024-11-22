@@ -249,6 +249,7 @@ async def process_conversation(client, model, messages, tools, names_to_function
                 tools=tools,
                 tool_choice="auto"
             )
+            print(response.choices[0].message)
             messages.append(response.choices[0].message)
 
             # Tool processing
@@ -361,7 +362,7 @@ def record_audio_fixed_duration(duration=5, sample_rate=16000):
     return np.squeeze(audio)
 
 # Function to detect wake word and proceed only when it is detected
-async def handle_client(websocket, path):
+async def handle_client(websocket):
     messages = []
     heartbeat_task = asyncio.create_task(send_custom_heartbeat(websocket))
 
@@ -378,8 +379,8 @@ async def handle_client(websocket, path):
                 # Transcribe and check for wake word
                 voice_input = whisper_model.transcribe(audio, fp16=False)['text']
                 print(f"Transcription for wake word detection: {voice_input}")
-
-                if "met" in voice_input.replace(" ","").lower() or "mat" in voice_input.replace(" ","").lower():
+                if "met" in voice_input.replace(" ", "").lower() or "mat" in voice_input.replace(" ","").lower() or "мэт" in voice_input.replace( " ", "").lower()\
+                        or "bad" in voice_input.replace(" ", "").lower() or "mad" in voice_input.replace(" ", "").lower():
                     print("Wake word detected. Recording full input...")
                     break  # Proceed to record the full input
 
@@ -410,7 +411,10 @@ async def handle_client(websocket, path):
                 )
 
             print("Response sent successfully. Waiting for the next wake word...")
-
+    except websockets.exceptions.ConnectionClosed:
+        print("Connection closed unexpectedly, attempting to reconnect.")
+        await asyncio.sleep(5)  # Delay before attempting reconnection
+        await handle_client(websocket, )
     finally:
         heartbeat_task.cancel()
         await websocket.wait_closed()

@@ -4,7 +4,7 @@ async def process_conversation(client, model, messages, tools, names_to_function
     retry_count = 0
     delay = initial_delay
     system_prompt = """Ты - помощник ведущего настольно-ролевой игры. Твоя задача помогать ведущему с помощью инструментов.
-        В своих ответах будь краток - 5-6 предложений. Если тебя просят включить или выключить музыку-В ответ скажи no-op.
+        В своих ответах будь краток - 5-6 предложений. 
         Для ответов на вопросы используй инструмент retrieve_related_chunks.
         В функцию generate_dungeon_map передавай аргументы json-ом.
         """
@@ -32,51 +32,92 @@ async def process_conversation(client, model, messages, tools, names_to_function
                     print(f"Tool requested: {function_name}")
 
                     # Handle music commands locally and skip Mistral response for these cases
-                    if function_name in ["play_online_music", "stop_music"]:
-                        function_params = json.loads(tool_call.function.arguments)
-                        names_to_functions[function_name](**function_params)
-                        print(f"Processed {function_name} locally with result: Success")
-                        messages.append({
-                            "role": "tool",
-                            "name": function_name,
-                            "content": "Music command processed."
-                        })
-                        continue
+
 
                     # Process other tool calls as normal
                     function_params = json.loads(tool_call.function.arguments)
                     print("func_params: ",function_params)
-                    if function_name in names_to_functions:
+
+                    if function_name == "retrieve_related_chunks":
+                        # Retrieve the first three chunks
+                        function_result = names_to_functions[function_name](**function_params)[:3]
+
+                        # Safely join the 'description' from each chunk
+                        chunks = " ".join(
+                            chunk.get("description", "") for chunk in function_result if isinstance(chunk, dict))
+                        print(chunks)
+                        print(type(chunks))
+                        # Append the message
+                        messages.append({
+                            "role": "tool",
+                            "name": function_name,
+                            "content": f""" Ты агент, помогающий игрокам в Dnd. Отвечай по существу и кратко, не более чем в 5-6 предложений.
+                            Ответь на вопрос {function_params["query"]} используя данные контекст:\n{chunks}.for """,
+                            "tool_call_id": tool_call.id
+                        })
+
+                        response = client.chat.complete(model=model, messages=messages)
+                        messages.append(response.choices[0].message)
+                        return response.choices[0].message.content
+
+
+                    if function_name == "generate_dungeon_map":
                         try:
-                            if function_name == "generate_dungeon_map":
-
-                                function_result = await names_to_functions[function_name](function_params)
-                                print("func_res: ",function_result)
-
-                            else:
-                                function_result = names_to_functions[function_name](**function_params)
+                            # Generate dungeon map asynchronously
+                            function_result = await names_to_functions[function_name](function_params)
+                            print("func_res: ", function_result)
                             result_data = json.loads(function_result)
 
+                            messages.append({
+                                "role": "tool",
+                                "name": function_name,
+                                "content": function_result,
+                                "tool_call_id": tool_call.id
+                            })
+                        except Exception as func_error:
+                            print(f"Error processing 'generate_dungeon_map': {func_error}")
+                            messages.append({
+                                "role": "tool",
+                                "name": function_name,
+                                "content": "Error processing tool function",
+                                "tool_call_id": tool_call.id
+                            })
 
-                            if function_name == "retrieve_related_chunks" and "chunks" in result_data:
-                                top_chunks = "\n".join(
-                                    chunk['description'] if isinstance(chunk, dict) and 'description' in chunk else str(chunk)
-                                    for chunk in result_data["chunks"][:3]
-                                )
-                                messages.append({
-                                    "role": "tool",
-                                    "name": function_name,
-                                    "content": f"Relevant Information:\n{top_chunks}",
-                                    "tool_call_id": tool_call.id
-                                })
-                            else:
-                                messages.append({
-                                    "role": "tool",
-                                    "name": function_name,
-                                    "content": function_result,
-                                    "tool_call_id": tool_call.id
-                                })
+                    elif function_name in ["play_music_from_playlist", "stop_audio"]:
+                        try:
+                            # Handle music commands locally
+                            names_to_functions[function_name](**function_params)
+                            print(f"Processed {function_name} locally with result: Success")
+                            messages.append({
+                                "role": "tool",
+                                "name": function_name,
+                                "content": "No-op",
+                                "tool_call_id": tool_call.id
+                            })
+                            response = client.chat.complete(model=model, messages=messages)
+                            messages.append(response.choices[0].message)
+                            return "No-op"
+                        except Exception as func_error:
+                            print(f"Error processing tool '{function_name}': {func_error}")
+                            messages.append({
+                                "role": "tool",
+                                "name": function_name,
+                                "content": "Error processing tool function",
+                                "tool_call_id": tool_call.id
+                            })
 
+                    elif function_name in names_to_functions:
+                        try:
+                            # Process all other tool calls
+                            function_result = names_to_functions[function_name](**function_params)
+                            result_data = json.loads(function_result)
+
+                            messages.append({
+                                "role": "tool",
+                                "name": function_name,
+                                "content": function_result,
+                                "tool_call_id": tool_call.id
+                            })
                         except Exception as func_error:
                             print(f"Error processing tool '{function_name}': {func_error}")
                             messages.append({
@@ -91,6 +132,8 @@ async def process_conversation(client, model, messages, tools, names_to_function
                 messages.append(response.choices[0].message)
                 return response.choices[0].message.content
             else:
+
+
                 return response.choices[0].message.content
         except Exception as e:
             if "429" in str(e):  # Handle rate limiting
