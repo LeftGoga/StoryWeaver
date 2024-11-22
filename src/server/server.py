@@ -1,6 +1,6 @@
 
 from model import create_whisper_model,create_mistral_agent
-from src.audio_processing.audio_processing import record_audio_for_wake_word, record_audio_fixed_duration, \
+from src.audio_processing.audio_processing import record_audio_for_wake_word, record_audio_until_silence, \
     text_to_speech
 
 import websockets
@@ -58,7 +58,7 @@ async def handle_client(websocket, path):
                     break  # Proceed to record the full input
 
             # Step 2: Record full input
-            audio = record_audio_fixed_duration(duration=10)  # Record with fixed duration
+            audio =  record_audio_until_silence()  # Record with fixed duration
             full_input = whisper_model.transcribe(audio, fp16=False)['text']
             print(f"Full input transcription: {full_input}")
 

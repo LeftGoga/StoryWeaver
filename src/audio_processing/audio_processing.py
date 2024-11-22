@@ -2,6 +2,10 @@ import sounddevice as sd
 import numpy as np
 from gtts import gTTS
 import io
+import time
+
+def normalize_audio(audio):
+    return audio / np.max(np.abs(audio)) if np.max(np.abs(audio)) > 0 else audio
 
 def record_audio(duration=5, sample_rate=16000):
     """
@@ -30,11 +34,56 @@ async def text_to_speech(text, language="ru"):
     audio_buffer.seek(0)
     return audio_buffer.read()
 
-def record_audio_fixed_duration(duration=5, sample_rate=16000):
-    print("Recording input after wake word...")
-    audio = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=1, dtype=np.float32)
-    sd.wait()
-    return np.squeeze(audio)
+
+
+def record_audio_until_silence(sample_rate=16000, silence_threshold=0.05, silence_duration=3.0, max_duration=60):
+    """
+    Records audio until the user stops speaking (based on silence detection), with verbosity.
+
+    :param sample_rate: Sampling rate of the audio
+    :param silence_threshold: Amplitude threshold to detect silence
+    :param silence_duration: Duration of silence (in seconds) to stop recording
+    :param max_duration: Maximum recording duration to prevent infinite loops
+    :return: Recorded audio as a NumPy array
+    """
+    buffer = []
+    start_time = time.time()
+    silent_start = None
+
+    print("Recording audio...")
+    while True:
+        # Record a short segment of audio
+        segment = sd.rec(int(0.5 * sample_rate), samplerate=sample_rate, channels=1, dtype=np.float32)
+        sd.wait()
+        segment = np.squeeze(segment)
+        buffer.append(segment)
+
+        # Detect silence
+        if np.max(np.abs(segment)) < silence_threshold:
+            if silent_start is None:
+                silent_start = time.time()
+            time_since_silence = time.time() - silent_start
+            time_left = silence_duration - time_since_silence
+            if time_left > 0:
+                print(f"Silence detected. Stopping in {time_left:.2f} seconds if no sound is detected.")
+            if time_since_silence >= silence_duration:
+                print("Silence duration exceeded. Stopping recording.")
+                break
+        else:
+            if silent_start is not None:
+                print("Sound detected. Resetting silence timer.")
+            silent_start = None  # Reset silence timer if sound is detected
+
+        # Stop after max duration
+        elapsed_time = time.time() - start_time
+        if elapsed_time >= max_duration:
+            print("Maximum recording duration reached. Stopping recording.")
+            break
+
+    print("Recording stopped.")
+    # Concatenate all segments into one audio array
+    return np.concatenate(buffer)
+
 
 def record_audio_for_wake_word(duration=2, sample_rate=16000, threshold=0.06):
 

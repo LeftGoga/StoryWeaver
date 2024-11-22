@@ -129,7 +129,7 @@ def stop_audio():
 
 
 # Function to play music from a playlist
-def play_music_from_playlist(query: str):
+def play_music_from_playlist(query: str,volume=50):
     global music_player
 
     # Check if music is already playing
