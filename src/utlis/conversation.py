@@ -1,12 +1,14 @@
 import json
 import time
+import asyncio
 async def process_conversation(client, model, messages, tools, names_to_functions, max_retries=5, initial_delay=2):
     retry_count = 0
     delay = initial_delay
     system_prompt = """Ты - помощник ведущего настольно-ролевой игры. Твоя задача помогать ведущему с помощью инструментов.
         В своих ответах будь краток - 5-6 предложений. 
         Для ответов на вопросы используй инструмент retrieve_related_chunks.
-        В функцию generate_dungeon_map передавай аргументы json-ом.
+        В функцию generate_dungeon_map передавай аргументы json-ом. Не пытайся придумать параметры дя генерации карты, 
+        которые не указал пользователь, просто не включай их в ответ
         """
     messages.insert(0, {
         "role": "system",
@@ -24,7 +26,7 @@ async def process_conversation(client, model, messages, tools, names_to_function
                 tool_choice="auto"
             )
             messages.append(response.choices[0].message)
-
+            print(response.choices[0].message.tool_calls)
             # Tool processing
             if response.choices[0].message.tool_calls:
                 for tool_call in response.choices[0].message.tool_calls:
@@ -60,20 +62,22 @@ async def process_conversation(client, model, messages, tools, names_to_function
                         messages.append(response.choices[0].message)
                         return response.choices[0].message.content
 
-
                     if function_name == "generate_dungeon_map":
                         try:
-                            # Generate dungeon map asynchronously
-                            function_result = await names_to_functions[function_name](function_params)
+                            # Generate dungeon map asynchronously and await the result
+                            function_result = names_to_functions[function_name](function_params)
                             print("func_res: ", function_result)
                             result_data = json.loads(function_result)
 
                             messages.append({
                                 "role": "tool",
                                 "name": function_name,
-                                "content": function_result,
+                                "content": "Map has been generated!",  # This is now a string, not a coroutine
                                 "tool_call_id": tool_call.id
                             })
+                            response = client.chat.complete(model=model, messages=messages)
+                            messages.append(response.choices[0].message)
+                            return "No-op"
                         except Exception as func_error:
                             print(f"Error processing 'generate_dungeon_map': {func_error}")
                             messages.append({

@@ -110,14 +110,26 @@ tools_dict = [
         "parameters": {
             "type": "object",
             "properties": {
-                "level": {"type": "integer", "description": "The dungeon level (difficulty)"},
-                "motif": {"type": "string", "enum": [
-        "","Abandoned","Aberrant","Giant","Undead","Vermin","Aquatic","Desert","Underdark","Arcane","Fire","Cold","Abyssal","Infernal",], "description": "The type of dungeon"},
-                "dungeon_size": {"type": "string", "enum": ["Fine", "Diminutive", "Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan", "Colossal", "Custom"], "description": "The size of the dungeon"},
-            },
-            "required": ["level", "dungeon_type", "size"],
-        },
-    },
+                "level": {
+                    "type": "integer",
+                    "description": "The dungeon level (difficulty)",
+                    "default": 3
+                },
+                "motif": {
+                    "type": "string",
+                    "enum": ["", "Abandoned", "Aberrant", "Giant", "Undead", "Vermin", "Aquatic", "Desert", "Underdark", "Arcane", "Fire", "Cold", "Abyssal", "Infernal"],
+                    "description": "The type of dungeon",
+                    "default": ""
+                },
+                "dungeon_size": {
+                    "type": "string",
+                    "enum": ["Fine", "Diminutive", "Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan", "Colossal", "Custom"],
+                    "description": "The size of the dungeon",
+                    "default": "Medium"
+                }
+            }
+        }
+    }
 }
 ]
 names_to_functions_dict = {
