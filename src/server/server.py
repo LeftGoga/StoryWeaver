@@ -68,7 +68,6 @@ async def handle_client(websocket, path):
             try:
 
                 response = await process_conversation(client, model_name, messages, tools, names_to_functions)
-                print("response: ", response)
             except Exception as e:
                 print(f"Error processing conversation: {e}")
                 response = "Error processing request; please try again."

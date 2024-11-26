@@ -203,8 +203,8 @@ def filter_video_by_query(video_titles, query):
     If Mistral finds a relevant match, it returns the corresponding video title.
     """
     prompt = f"""
-    Given the following video titles and the query '{query}', which video title best fits the request? Titles: {video_titles}. Return only the name of the video.
-    So good answer for  Включи музыку для города would be Colony 6 - Rebuilding Extended - Xenoblade Chronicles Definitive Edition OST, not "To determine which video title best fits the query 'музыка для города' (which translates to "music for the city"), we need to identify a title that suggests an urban or city-related theme.
+    Given the following video titles and the query '{query}', which video title best fits the request? Titles: {video_titles}. Be really short in your answer, 1 sentence max, Return only the name of the video.
+    So good answer for  Включи музыку для города would be "Colony 6 - Rebuilding Extended - Xenoblade Chronicles Definitive Edition OST", not "To determine which video title best fits the query 'музыка для города' (which translates to "music for the city"), we need to identify a title that suggests an urban or city-related theme.
 The title "Colony 6 - Rebuilding Extended - Xenoblade Chronicles Definitive Edition OST" seems to fit best as "Colony 6" suggests a developed area, which could be associated with a city."
 """
 

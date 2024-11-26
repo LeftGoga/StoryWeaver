@@ -59,7 +59,7 @@ class DungeonParams(BaseModel):
     grid: Literal["None", "Square", "Hex", "VertHex"] = "Square",
     n_pc: Literal[1,2,3,4,5,6] = 4
 
-async def write_map_to_file(map_data, output_path):
+def write_map_to_file(map_data, output_path):
     """
     Asynchronously writes map data to a file.
     Offloads the file I/O to a separate thread to prevent blocking the event loop.
@@ -113,7 +113,7 @@ def generate_dungeon_map(params: dict = {}, output_path: str = "map.png") -> str
 
         # Step 4: Use asyncio.to_thread to write the map in a separate thread
         # This ensures the event loop is not blocked by file I/O
-        asyncio.create_task(write_map_to_file(map_response.content, output_path))
+        write_map_to_file(map_response.content, output_path)
 
         print(f"Map generation complete. Map will be saved to {output_path}.")
         return json.dumps({"status": "success", "path": output_path})
@@ -122,3 +122,7 @@ def generate_dungeon_map(params: dict = {}, output_path: str = "map.png") -> str
         print(f"Error generating dungeon map: {e}")
         return json.dumps({"status": "error", "message": str(e)})
 
+async def main():
+    generate_dungeon_map()
+if __name__ == "__main__":
+    asyncio.run(main())

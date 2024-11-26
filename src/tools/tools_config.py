@@ -55,7 +55,7 @@ tools_dict = [
         "type": "function",
         "function": {
             "name": "retrieve_related_chunks",
-            "description": "Retrieve related chunks from the database to answer a query",
+            "description": "Retrieve related chunks from the database to answer a query. Use this when you get questions",
             "parameters": {
                 "type": "object",
                 "properties": {

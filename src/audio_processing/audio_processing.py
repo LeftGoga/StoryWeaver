@@ -1,3 +1,5 @@
+import asyncio
+
 import sounddevice as sd
 import numpy as np
 from gtts import gTTS
@@ -20,20 +22,25 @@ def record_audio(duration=5, sample_rate=16000):
 
 async def text_to_speech(text, language="ru"):
     """
-    имплементация TTS
-    :param text:
-    :param language:
-    :return:
+    Asynchronous wrapper for TTS with blocking I/O offloaded to a thread.
     """
     if "No-op" in text:
         print("Ignoring placeholder response for text-to-speech.")
         return generate_silent_audio(duration=1)
+
+    # Offload blocking TTS operation to a thread
+    audio_data = await asyncio.to_thread(generate_tts_audio, text, language)
+    return audio_data
+
+def generate_tts_audio(text, language):
+    """
+    Generate TTS audio using gTTS (blocking operation).
+    """
     tts = gTTS(text=text, lang=language, slow=False)
     audio_buffer = io.BytesIO()
     tts.write_to_fp(audio_buffer)
     audio_buffer.seek(0)
     return audio_buffer.read()
-
 
 
 def record_audio_until_silence(sample_rate=16000, silence_threshold=0.05, silence_duration=3.0, max_duration=60):
@@ -129,19 +136,9 @@ def generate_silent_audio(duration=1):
     audio_bytes = silent_audio.tobytes()  # Convert to bytes for sending
     return audio_bytes
 
+async def main():
+    audio_data = await text_to_speech("Транзакция 1 успешно оплачена.")
+    print("Audio data generated:", len(audio_data), "bytes")
 
 if __name__ == "__main__":
-    import asyncio
-    from pydub import AudioSegment
-    from pydub.playback import play
-    import time
-    async def main():
-        audio_data = await text_to_speech("тест 1")
-        audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
-        play(audio)
-        audio_data = await text_to_speech("тест 2")
-        audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
-        play(audio)
-
-
     asyncio.run(main())
