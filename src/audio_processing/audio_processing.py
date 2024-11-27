@@ -43,7 +43,7 @@ def generate_tts_audio(text, language):
     return audio_buffer.read()
 
 
-def record_audio_until_silence(sample_rate=16000, silence_threshold=0.05, silence_duration=3.0, max_duration=60):
+def record_audio_until_silence(sample_rate=16000, silence_threshold=0.05, silence_duration=5.0, max_duration=60):
     """
     Records audio until the user stops speaking (based on silence detection), with verbosity.
 

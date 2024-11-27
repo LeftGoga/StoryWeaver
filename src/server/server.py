@@ -71,7 +71,8 @@ async def handle_client(websocket, path):
             except Exception as e:
                 print(f"Error processing conversation: {e}")
                 response = "Error processing request; please try again."
-
+            if len(messages)>10:
+                messages = messages[-10:]
             if response in ["No-op"]:
                 print("Placeholder response received; resuming listening.")
                 continue  # Immediately go back to listening without TTS
