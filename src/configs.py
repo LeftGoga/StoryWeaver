@@ -1,7 +1,7 @@
 import torch
 import os
 
-whisper_model_size = "turbo"
+whisper_model_size = "medium"
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 api_key = os.environ.get("MISTRAL_API_KEY")

@@ -28,6 +28,7 @@ pafy = "^0.5.5"
 youtube-dl = "^2021.12.17"
 pygame = "^2.6.1"
 simpleaudio = "^1.0.4"
+boto3 = "^1.35.78"
 
 
 [build-system]

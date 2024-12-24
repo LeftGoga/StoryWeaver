@@ -55,7 +55,7 @@ tools_dict = [
         "type": "function",
         "function": {
             "name": "retrieve_related_chunks",
-            "description": "Retrieve related chunks from the database to answer a query. Use this when you get questions",
+            "description": "Retrieve related chunks from the database to answer a query. Use this when you get questions.Use cases: speaks of game rules",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -72,7 +72,7 @@ tools_dict = [
     "type": "function",
     "function": {
         "name": "play_music_from_playlist",
-        "description": "Play certain music depending on user query",
+        "description": "Play certain music depending on user query. Use cases: When party enter a location, when changing a mood of scene(e.g. Started Fight)",
         "parameters": {
             "type": "object",
             "properties": {
@@ -106,7 +106,7 @@ tools_dict = [
     "type": "function",
     "function": {
         "name": "generate_dungeon_map",
-        "description": "Generate a fantasy dungeon map based on specified parameters",
+        "description": "Generate a fantasy dungeon map based on specified parameters. Use cases: Entering a dungeon or any other similiar stucture",
         "parameters": {
             "type": "object",
             "properties": {

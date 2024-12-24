@@ -5,6 +5,7 @@ async def process_conversation(client, model, messages, tools, names_to_function
     retry_count = 0
     delay = initial_delay
     system_prompt = """Ты - помощник ведущего настольно-ролевой игры. Твоя задача помогать ведущему с помощью инструментов.
+        Тебе будет подаваться отрывки из игрового диалогА, тебе придется проанализировать его и понять, какие инструменты надо применить.
         В своих ответах будь как можно более краток - не более 5-6 предложений. 
         Для ответов на вопросы используй инструмент retrieve_related_chunks, подавай в запрос больше информации от пользователя.
         В функцию generate_dungeon_map передавай аргументы json-ом, Если пользователь не указал параметры, бери по параметры умолчанию 
@@ -26,7 +27,7 @@ async def process_conversation(client, model, messages, tools, names_to_function
                 tool_choice="auto"
             )
             messages.append(response.choices[0].message)
-            print(response.choices[0].message.tool_calls)
+            print("tools: ", response.choices[0].message.tool_calls)
             # Tool processing
             if response.choices[0].message.tool_calls:
                 for tool_call in response.choices[0].message.tool_calls:

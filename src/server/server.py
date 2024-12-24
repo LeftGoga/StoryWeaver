@@ -10,6 +10,7 @@ from src.configs import model_name
 
 from src.tools.tools_config import tools_dict, names_to_functions_dict
 import asyncio
+import time
 music_player = None
 
 play_obj = None
@@ -36,96 +37,93 @@ async def send_custom_heartbeat(websocket):
 
 async def handle_client(websocket, path):
     messages = []
-    heartbeat_task = asyncio.create_task(send_custom_heartbeat(websocket))  # Heartbeat task to keep the connection alive
-
+    heartbeat_task = asyncio.create_task(send_custom_heartbeat(websocket))
+    
     try:
         while True:
-            # Step 1: Wait for the wake word
-            print("Listening for the wake word 'StoryWeaver'...")
-
-            while True:
-                audio = record_audio_for_wake_word(duration=2)  # Short listening for wake word detection
-                if audio is None:
-                    continue  # No significant audio detected, continue listening
-
-                # Transcribe and check for wake word
-                voice_input = whisper_model.transcribe(audio, fp16=False)['text']
-                print(f"Transcription for wake word detection: {voice_input}")
-
-                if "met" in voice_input.replace(" ","").lower() or "mat" in voice_input.replace(" ","").lower() or "мэт" in voice_input.replace(" ","").lower() or "bad" in voice_input.replace(" ","").lower()\
-                        or "mad" in voice_input.replace(" ","").lower():
-                    print("Wake word detected. Recording full input...")
-                    break  # Proceed to record the full input
-
-            # Step 2: Record full input
-            audio =  record_audio_until_silence()  # Record with fixed duration
-            full_input = whisper_model.transcribe(audio, fp16=False)['text']
-            print(f"Full input transcription: {full_input}")
-
-            # Step 3: Process full input and interact with Mistral API
-            processed_input = full_input.replace("StoryWeaver", "").strip()
-            messages.append({"role": "user", "content": processed_input})
-            try:
-
-                response = await process_conversation(client, model_name, messages, tools, names_to_functions)
-            except Exception as e:
-                print(f"Error processing conversation: {e}")
-                response = "Error processing request; please try again."
-            if len(messages)>10:
-                messages = messages[-10:]
-            if response in ["No-op"]:
-                print("Placeholder response received; resuming listening.")
-                continue  # Immediately go back to listening without TTS
-
-            if response:  # Only send audio if there's a text response
-                print(f"Sending text response: {response}")
-
-                # Step 4: Prepare audio response
-                audio_data = await text_to_speech(response)
-                print("Audio response generated.")
-
-                # Step 5: Send both responses concurrently
+            # Записываем аудио в течение 15 секунд
+            print("Слушаю разговор...")
+            audio = record_audio_for_wake_word(duration=15)
+            
+            if audio is None:
+                continue
+                
+            # Транскрибируем записанный отрезок
+            voice_input = whisper_model.transcribe(audio, fp16=False)['text']
+            print(f"Записанный текст: {voice_input}")
+            check_prompt = f"""Ты — помощник для ведущего и игроков в Dungeons & Dragons. Твоя цель — анализировать текстовые отрывки из диалогов партии и определять, требуется ли твоё вмешательство.
+                            Ты можешь:
+                            Объяснить правила игры — если в диалоге обсуждаются механики игры, такие как броски кубиков, использование заклинаний или особенности классов и навыков.
+                            Сгенерировать карту — если в диалоге упоминается необходимость визуализации сцены, например, сражения, подземелья или города.
+                            Включить музыку — если в диалоге упоминается новое место действия или новый характер сцены, а так же разговор об атмосфере.
+                            Отрывок из разговора партии : {voice_input}.
+                            Отвечай только да или нет"""
+            # Отправляем текст Mistral для проверки необходимости вмешательства
+            check_message = {"role": "user", "content": check_prompt}
+            response = client.chat.complete(model="mistral-small-latest", messages=[check_message])
+            time.sleep(2)
+            should_intervene = response.choices[0].message.content.lower()
+            print(should_intervene )
+            if "да" in should_intervene:
+                print("Mistral решил вмешаться в разговор")
+                messages.append({"role": "user", "content": voice_input})
+                
                 try:
-                    await asyncio.gather(
-                        websocket.send(response),         # Send text response
-                        websocket.send(audio_data)        # Send audio response
-                    )
-                    print("Response sent successfully.")
-                except websockets.exceptions.ConnectionClosed as e:
-                    print(f"Error sending response to client: {e}. WebSocket may have closed unexpectedly.")
-                    break  # Stop processing if the connection is closed
+                    response = await process_conversation(client, model_name, messages, tools, names_to_functions)
                 except Exception as e:
-                    print(f"Unexpected error during response send: {e}")
-                    break  # Exit loop on unexpected errors
+                    print(f"Ошибка обработки диалога: {e}")
+                    response = "Произошла ошибка, попробуйте еще раз."
+                    
+                if len(messages) > 10:
+                    messages = messages[-10:]
+                    
+                if response in ["No-op"]:
+                    print("Получен пустой ответ, продолжаю слушать.")
+                    continue
 
-            print("Waiting for the next wake word...")
+                if response:
+                    print(f"Отправляю текстовый ответ: {response}")
+                    audio_data = await text_to_speech(response)
+                    print("Аудио ответ сгенерирован.")
+
+                    try:
+                        await asyncio.gather(
+                            websocket.send(response),
+                            websocket.send(audio_data)
+                        )
+                        print("Ответ успешно отправлен.")
+                    except websockets.exceptions.ConnectionClosed as e:
+                        print(f"Ошибка отправки ответа клиенту: {e}")
+                        break
+                    except Exception as e:
+                        print(f"Неожиданная ошибка при отправке: {e}")
+                        break
+            else:
+                print("Mistral решил не вмешиваться, продолжаю слушать...")
 
     except websockets.exceptions.ConnectionClosed as e:
-        print(f"Connection closed by the client or server: {e}")
+        print(f"Соединение закрыто клиентом или сервером: {e}")
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        print(f"Неожиданная ошибка: {e}")
     finally:
-        # Gracefully close the WebSocket connection when the client disconnects
-        print("Closing WebSocket connection.")
+        print("Закрываю WebSocket соединение.")
         try:
-            await websocket.send("Closing connection.")  # Inform the client of closure
+            await websocket.send("Закрываю соединение.")
         except Exception as e:
-            print(f"Error sending close message: {e}")
-        await websocket.close()  # Close the WebSocket connection properly
-        heartbeat_task.cancel()  # Cancel the heartbeat task
-        await websocket.wait_closed()  # Ensure the WebSocket is properly closed
-        print("Client connection fully closed.")
-
-
+            print(f"Ошибка отправки сообщения о закрытии: {e}")
+        await websocket.close()
+        heartbeat_task.cancel()
+        await websocket.wait_closed()
+        print("Соединение с клиентом полностью закрыто.")
 
 async def main():
-    print("Starting WebSocket server...")
+    print("Запуск WebSocket сервера...")
     while True:
         try:
             async with websockets.serve(handle_client, "localhost", 8765, ping_interval=None):
                 await asyncio.Future()
         except Exception as e:
-            print(f"Server error: {e}. Restarting in 10 seconds...")
+            print(f"Ошибка сервера: {e}. Перезапуск через 10 секунд...")
             await asyncio.sleep(10)
 
 asyncio.run(main())
