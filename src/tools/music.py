@@ -4,13 +4,15 @@ import io
 import pygame
 import numpy as np
 from pydub import AudioSegment
-import threading
 import json
 import difflib
 import time
+
 from src.server.model import create_mistral_agent
+
 client = create_mistral_agent()
-# Global player variables
+
+
 play_obj = None
 music_player = None
 model = "mistral-large-latest"  # Replace with your model name
@@ -73,7 +75,7 @@ def stop_audio():
     return json.dumps({"status": "No-op"})
 
 # Function to play music from the S3 playlist
-def play_music_from_playlist(query: str, volume=50):
+def play_music_from_playlist(query: str, volume=30):
     global music_player
 
     # Check if music is already playing
@@ -131,7 +133,7 @@ def play_music_from_playlist(query: str, volume=50):
 
     # Create and start a new player instance
     music_player = 1
-    play_audio_from_s3(video_url)
+    play_audio_from_s3(video_url, volume = volume/10)
 
     return "No-op"
 
@@ -157,7 +159,7 @@ def filter_video_by_query(video_titles, query):
     return best_match
 
 if __name__=="__main__":
-    import time
+
     play_music_from_playlist("play music for small rural town")
     time.sleep(15)
     stop_audio()

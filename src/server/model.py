@@ -1,5 +1,6 @@
 import whisper
 from mistralai import Mistral
+
 from src.configs import device, whisper_model_size ,api_key
 
 def create_whisper_model(whisper_model_size:str = whisper_model_size):

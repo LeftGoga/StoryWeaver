@@ -1,8 +1,10 @@
 import functools
+import pandas as pd
+
 from src.tools.payment_tool import retrieve_payment_date,retrieve_payment_status
 from src.tools.music import play_music_from_playlist,stop_audio
 from src.tools.dungeon_map import generate_dungeon_map
-import pandas as pd
+
 
 from tools.rag import retrieve_related_chunks
 
@@ -82,8 +84,8 @@ tools_dict = [
                 },
                 "volume": {
                     "type": "integer",
-                    "description": "The playback volume level (1-100). Default is 50.",
-                    "default": 50,
+                    "description": "The playback volume level (1-100). Default is 30.",
+                    "default": 30,
                 },
             },
             "required": ["query"],

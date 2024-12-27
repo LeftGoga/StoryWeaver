@@ -1,6 +1,7 @@
 
 import json
 import requests
+
 from src.configs import rag_url
 
 def retrieve_related_chunks(query: str) -> str:

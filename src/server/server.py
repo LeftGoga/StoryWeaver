@@ -1,29 +1,27 @@
-
-from model import create_whisper_model,create_mistral_agent
-from src.audio_processing.audio_processing import record_audio_for_wake_word, record_audio_until_silence, \
-    text_to_speech
-
 import websockets
-from src.utlis.conversation import process_conversation
-
-from src.configs import model_name
-
-from src.tools.tools_config import tools_dict, names_to_functions_dict
 import asyncio
 import time
-music_player = None
 
+from model import create_whisper_model,create_mistral_agent
+from src.configs import model_name
+from src.utlis.conversation import process_conversation
+
+from src.audio_processing.audio_processing import record_audio_for_wake_word,text_to_speech
+from src.tools.tools_config import tools_dict, names_to_functions_dict
+
+
+music_player = None
 play_obj = None
 playback_thread = None
 
 
 whisper_model = create_whisper_model()
+client = create_mistral_agent()
 
 tools = tools_dict
 names_to_functions = names_to_functions_dict
 
 
-client = create_mistral_agent()
 
 
 async def send_custom_heartbeat(websocket):
@@ -51,13 +49,17 @@ async def handle_client(websocket, path):
             # Транскрибируем записанный отрезок
             voice_input = whisper_model.transcribe(audio, fp16=False)['text']
             print(f"Записанный текст: {voice_input}")
-            check_prompt = f"""Ты — помощник для ведущего и игроков в Dungeons & Dragons. Твоя цель — анализировать текстовые отрывки из диалогов партии и определять, требуется ли твоё вмешательство.
-                            Ты можешь:
-                            Объяснить правила игры — если в диалоге обсуждаются механики игры, такие как броски кубиков, использование заклинаний или особенности классов и навыков.
-                            Сгенерировать карту — если в диалоге упоминается необходимость визуализации сцены, например, сражения, подземелья или города.
-                            Включить музыку — если в диалоге упоминается новое место действия или новый характер сцены, а так же разговор об атмосфере.
-                            Отрывок из разговора партии : {voice_input}.
-                            Отвечай только да или нет"""
+            check_prompt = f"""Ты — многофункциональный помощник для ведущего и игроков в Dungeons & Dragons (DnD). Твоя цель — анализировать транскрибированные текстовые отрывки из диалогов участника (или участников) партии и определять, требует ли такое взаимодействие дальнейшего внимания и действия основного агента. Твои основные задачи, которые могут требовать вмешательства, включают:
+
+1. **Объяснение правил игры**: Когда обсуждаются механики игры, такие как броски кубиков, использование заклинаний или уникальные особенности классов и навыков, ты должен определить, если это уместно.
+2. **Генерация карты**: Если в диалоге обсуждается необходимость создания визуализации сцены, к примеру, для сражения, подземелья или города, твое вмешательство может понадобиться.
+3. **Включение музыки**: Если обсуждается новое место действия или выражается изменение в атмосфере или характере сцены, стоит задуматься о сопровождении музыкой для создания соответствующего настроения.
+
+Каждый раз, когда ты анализируешь текстовый отрывок, оценивай только требует ли он твоего вмешательства согласного вышеописанным сценариям. Используй предоставленный текстовой отрывок из разговора участников партии для анализа: {voice_input}.
+
+Отвечай только "да" или "нет", в зависимости от того, уместно ли твоё вмешательство в контексте текущего обсуждения."""
+
+
             # Отправляем текст Mistral для проверки необходимости вмешательства
             check_message = {"role": "user", "content": check_prompt}
             response = client.chat.complete(model="mistral-small-latest", messages=[check_message])
