@@ -31,7 +31,7 @@ s3_song_list = [
 ]
 
 # Function to play audio from an S3 URL
-def play_audio_from_s3(url, volume=0.3):
+def play_audio_from_s3(url, volume=0.01):
     global play_obj
 
     # Stop any previous playback before starting a new one
@@ -75,7 +75,7 @@ def stop_audio():
     return json.dumps({"status": "No-op"})
 
 # Function to play music from the S3 playlist
-def play_music_from_playlist(query: str, volume=30):
+def play_music_from_playlist(query: str, volume=1):
     global music_player
 
     # Check if music is already playing
@@ -160,6 +160,6 @@ def filter_video_by_query(video_titles, query):
 
 if __name__=="__main__":
 
-    play_music_from_playlist("play music for small rural town")
+    play_music_from_playlist("play music for battle")
     time.sleep(15)
     stop_audio()

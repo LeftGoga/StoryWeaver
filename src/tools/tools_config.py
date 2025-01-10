@@ -84,8 +84,8 @@ tools_dict = [
                 },
                 "volume": {
                     "type": "integer",
-                    "description": "The playback volume level (1-100). Default is 30.",
-                    "default": 30,
+                    "description": "The playback volume level (1-100). Default is 1.",
+                    "default": 1,
                 },
             },
             "required": ["query"],
@@ -105,34 +105,72 @@ tools_dict = [
         },
     },
 {
-    "type": "function",
-    "function": {
-        "name": "generate_dungeon_map",
-        "description": "Generate a fantasy dungeon map based on specified parameters. Use cases: Entering a dungeon or any other similiar stucture",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "level": {
-                    "type": "integer",
-                    "description": "The dungeon level (difficulty)",
-                    "default": 3
-                },
-                "motif": {
-                    "type": "string",
-                    "enum": ["", "Abandoned", "Aberrant", "Giant", "Undead", "Vermin", "Aquatic", "Desert", "Underdark", "Arcane", "Fire", "Cold", "Abyssal", "Infernal"],
-                    "description": "The type of dungeon",
-                    "default": ""
-                },
-                "dungeon_size": {
-                    "type": "string",
-                    "enum": ["Fine", "Diminutive", "Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan", "Colossal", "Custom"],
-                    "description": "The size of the dungeon",
-                    "default": "Medium"
-                }
+  "type": "function",
+  "function": {
+    "name": "generate_dungeon_map",
+    "description": "Generate a fantasy dungeon map based on specified parameters. Use cases: Entering a dungeon, monster hideout or similar structure.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "params": {
+          "type": "object",
+          "description": "Dungeon generation parameters.",
+          "properties": {
+            "level": {
+              "type": "integer",
+              "description": "The dungeon level (difficulty)",
+              "default": 3
+            },
+            "motif": {
+              "type": "string",
+              "enum": [
+                "",
+                "Abandoned",
+                "Aberrant",
+                "Giant",
+                "Undead",
+                "Vermin",
+                "Aquatic",
+                "Desert",
+                "Underdark",
+                "Arcane",
+                "Fire",
+                "Cold",
+                "Abyssal",
+                "Infernal"
+              ],
+              "description": "The type of dungeon",
+              "default": ""
+            },
+            "dungeon_size": {
+              "type": "string",
+              "enum": [
+                "Fine",
+                "Diminutive",
+                "Tiny",
+                "Small",
+                "Medium",
+                "Large",
+                "Huge",
+                "Gargantuan",
+                "Colossal",
+                "Custom"
+              ],
+              "description": "The size of the dungeon",
+              "default": "Medium"
             }
+          }
+        },
+        "output_path": {
+          "type": "string",
+          "description": "Path to save the generated dungeon map image",
+          "default": "map.png"
         }
+      }
     }
+  }
 }
+
 ]
 names_to_functions_dict = {
     'retrieve_payment_status': functools.partial(retrieve_payment_status, df=df),

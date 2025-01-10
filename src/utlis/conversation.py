@@ -10,6 +10,7 @@ async def process_conversation(client, model, messages, tools, names_to_function
 # Задачи
 1. **Анализировать диалог:** Принимай входящие части диалога, чтобы определять, какие инструменты наиболее полезны в контексте текущей игровой ситуации.
 2. **Предлагать решения:** На основе анализа предоставляй краткие, чёткие рекомендации или действия. Ответы должны быть ёмкими, не более чем 5-6 предложений.
+3. **Решение комплексных задач**: иногда потребуется использовать несколько инструментов, например для настройки сцены.
 
 # Использование инструментов
 - **Поиск информации:** Для ответов на вопросы используй инструмент `retrieve_related_chunks`. Включай как можно больше релевантной информации из контекста пользователя.
@@ -19,15 +20,12 @@ async def process_conversation(client, model, messages, tools, names_to_function
 # Формат Ответа
 Рекомендации и действия в формате, понятном и удобном для восприятия ведущего.
         """
-    messages.insert(0, {
-        "role": "system",
-        "content": system_prompt
-    })
+    messages.insert(0, {"role": "system", "content": system_prompt})
+    processed_tool_calls = set()  # Track processed tool_call IDs
 
     while retry_count < max_retries:
         try:
-            # Initial response from Mistral with tool selection
-
+            # Generate a response from the AI model
             response = client.chat.complete(
                 model=model,
                 messages=messages,
@@ -36,126 +34,93 @@ async def process_conversation(client, model, messages, tools, names_to_function
             )
             messages.append(response.choices[0].message)
             print("tools: ", response.choices[0].message.tool_calls)
-            # Tool processing
+
+            # Process tool calls if present
             if response.choices[0].message.tool_calls:
                 for tool_call in response.choices[0].message.tool_calls:
+                    tool_call_id = tool_call.id
+
+                    # Skip already processed tool calls
+                    if tool_call_id in processed_tool_calls:
+                        continue
+                    processed_tool_calls.add(tool_call_id)
+
                     function_name = tool_call.function.name
                     print(f"Tool requested: {function_name}")
 
-                    # Handle music commands locally and skip Mistral response for these cases
-
-
-                    # Process other tool calls as normal
+                    # Extract tool call parameters
                     function_params = json.loads(tool_call.function.arguments)
-                    print("func_params: ",function_params)
 
-                    if function_name == "retrieve_related_chunks":
-                        # Retrieve the first three chunks
-                        function_result = names_to_functions[function_name](**function_params)[:3]
+                    try:
+                        if function_name in names_to_functions:
+                            # Call the tool function
+                            function_result = names_to_functions[function_name](**function_params)
 
-                        # Safely join the 'description' from each chunk
-                        chunks = " ".join(
-                            chunk.get("description", "") for chunk in function_result if isinstance(chunk, dict))
-                        print(chunks)
-                        print(type(chunks))
-                        # Append the message
+                            # Append the tool response to messages
+                            messages.append({
+                                "role": "tool",
+                                "name": function_name,
+                                "content": json.dumps(function_result),
+                                "tool_call_id": tool_call_id
+                            })
+
+                        else:
+                            print(f"Unknown tool: {function_name}")
+                            messages.append({
+                                "role": "tool",
+                                "name": function_name,
+                                "content": "Error: Unknown tool",
+                                "tool_call_id": tool_call_id
+                            })
+                    except Exception as func_error:
+                        print(f"Error processing tool '{function_name}': {func_error}")
                         messages.append({
                             "role": "tool",
                             "name": function_name,
-                            "content": f""" Ты агент, помогающий игрокам в Dnd. Отвечай по существу и кратко, не более чем в 5-6 предложений.
-                            Ответь на вопрос {function_params["query"]} используя данные контекст:\n{chunks}.for """,
-                            "tool_call_id": tool_call.id
+                            "content": "Error processing tool function",
+                            "tool_call_id": tool_call_id
                         })
 
-                        response = client.chat.complete(model=model, messages=messages)
-                        messages.append(response.choices[0].message)
-                        return response.choices[0].message.content
-
-                    if function_name == "generate_dungeon_map":
-                        try:
-                            # Generate dungeon map asynchronously and await the result
-                            function_result = names_to_functions[function_name](function_params)
-                            print("func_res: ", function_result)
-                            result_data = json.loads(function_result)
-
-                            messages.append({
-                                "role": "tool",
-                                "name": function_name,
-                                "content": "Map has been generated!",  # This is now a string, not a coroutine
-                                "tool_call_id": tool_call.id
-                            })
-                            response = client.chat.complete(model=model, messages=messages)
-                            messages.append(response.choices[0].message)
-                            return "No-op"
-                        except Exception as func_error:
-                            print(f"Error processing 'generate_dungeon_map': {func_error}")
-                            messages.append({
-                                "role": "tool",
-                                "name": function_name,
-                                "content": "Error processing tool function",
-                                "tool_call_id": tool_call.id
-                            })
-
-                    elif function_name in ["play_music_from_playlist", "stop_audio"]:
-                        try:
-                            # Handle music commands locally
-                            names_to_functions[function_name](**function_params)
-                            print(f"Processed {function_name} locally with result: Success")
-                            messages.append({
-                                "role": "tool",
-                                "name": function_name,
-                                "content": "No-op",
-                                "tool_call_id": tool_call.id
-                            })
-                            response = client.chat.complete(model=model, messages=messages)
-                            messages.append(response.choices[0].message)
-                            return "No-op"
-                        except Exception as func_error:
-                            print(f"Error processing tool '{function_name}': {func_error}")
-                            messages.append({
-                                "role": "tool",
-                                "name": function_name,
-                                "content": "Error processing tool function",
-                                "tool_call_id": tool_call.id
-                            })
-
-                    elif function_name in names_to_functions:
-                        try:
-                            # Process all other tool calls
-                            function_result = names_to_functions[function_name](**function_params)
-                            result_data = json.loads(function_result)
-
-                            messages.append({
-                                "role": "tool",
-                                "name": function_name,
-                                "content": function_result,
-                                "tool_call_id": tool_call.id
-                            })
-                        except Exception as func_error:
-                            print(f"Error processing tool '{function_name}': {func_error}")
-                            messages.append({
-                                "role": "tool",
-                                "name": function_name,
-                                "content": "Error processing tool function",
-                                "tool_call_id": tool_call.id
-                            })
-
-                # Only request a new Mistral completion for non-music tools
+                # Make a follow-up AI response after tool calls
                 response = client.chat.complete(model=model, messages=messages)
                 messages.append(response.choices[0].message)
                 return response.choices[0].message.content
+
             else:
-
-
                 return response.choices[0].message.content
+
         except Exception as e:
             if "429" in str(e):  # Handle rate limiting
                 retry_count += 1
                 print(f"Rate limit hit. Retrying in {delay} seconds...")
-                time.sleep(delay)
+                await asyncio.sleep(delay)
                 delay *= 2  # Exponential backoff
             else:
                 print(f"Error: {e}")
                 return "Error processing request; please try again."
 
     return "Exceeded maximum retry attempts due to rate limiting."
+
+if __name__ =="__main__":
+    from src.server.model import create_mistral_agent
+    from src.configs import model_name
+    from src.tools.tools_config import tools_dict, names_to_functions_dict
+    import asyncio
+
+    async def main():
+        music_player = None
+        play_obj = None
+        playback_thread = None
+
+        client = create_mistral_agent()
+        messages = []
+        voice_input = "Вы прибываете в подземелье дракона и начинается бой"
+        messages.append({"role": "user", "content": voice_input})
+        tools = tools_dict
+        names_to_functions = names_to_functions_dict
+
+        answer = await process_conversation(client, model_name, messages, tools, names_to_functions)
+        print(answer)
+
+
+    asyncio.run(main())
