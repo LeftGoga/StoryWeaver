@@ -5,6 +5,9 @@ from gtts import gTTS
 import io
 import time
 
+import pyttsx3
+
+
 def normalize_audio(audio):
     return audio / np.max(np.abs(audio)) if np.max(np.abs(audio)) > 0 else audio
 
@@ -31,13 +34,21 @@ async def text_to_speech(text, language="ru"):
     audio_data = await asyncio.to_thread(generate_tts_audio, text, language)
     return audio_data
 
-def generate_tts_audio(text, language):
+
+
+
+def generate_tts_audio(text, voice_gender="MALE"):
     """
-    Generate TTS audio using gTTS (blocking operation).
+    Generate TTS audio using pyttsx3 with voice selection.
     """
-    tts = gTTS(text=text, lang=language, slow=False)
+    engine = pyttsx3.init()
+    voices = engine.getProperty("voices")
+
+    engine.setProperty("voice","HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_EN-US_DAVID_11.0")
+
     audio_buffer = io.BytesIO()
-    tts.write_to_fp(audio_buffer)
+    engine.save_to_file(text, audio_buffer)
+    engine.runAndWait()
     audio_buffer.seek(0)
     return audio_buffer.read()
 
@@ -135,9 +146,7 @@ def generate_silent_audio(duration=1):
     audio_bytes = silent_audio.tobytes()  # Convert to bytes for sending
     return audio_bytes
 
-async def main():
-    audio_data = await text_to_speech("Транзакция 1 успешно оплачена.")
-    print("Audio data generated:", len(audio_data), "bytes")
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    print(generate_tts_audio("Hello"))
